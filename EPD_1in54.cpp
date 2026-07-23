@@ -195,7 +195,6 @@ static void EPD_1IN54_TurnOnDisplay(void)
     EPD_1IN54_SendData(0xC4);
     EPD_1IN54_SendCommand(0x20); // MASTER_ACTIVATION
     EPD_1IN54_SendCommand(0xFF); // TERMINATE_FRAME_READ_WRITE
-
     EPD_1IN54_ReadBusy();
 }
 
@@ -255,6 +254,18 @@ void EPD_1IN54_Clear(void)
     Width = (EPD_1IN54_WIDTH % 8 == 0)? (EPD_1IN54_WIDTH / 8 ): (EPD_1IN54_WIDTH / 8 + 1);
     Height = EPD_1IN54_HEIGHT;
     EPD_1IN54_SetWindow(0, 0, EPD_1IN54_WIDTH, EPD_1IN54_HEIGHT);
+
+    // 第一次：写 0x24 + 刷新，清屏
+    for (UWORD j = 0; j < Height; j++) {
+        EPD_1IN54_SetCursor(0, j);
+        EPD_1IN54_SendCommand(0x24);
+        for (UWORD i = 0; i < Width; i++) {
+            EPD_1IN54_SendData(0XFF);
+        }
+    }
+    EPD_1IN54_TurnOnDisplay();
+
+    // 第二次：重新写 0x24 + 刷新，消耗"首次无效帧"
     for (UWORD j = 0; j < Height; j++) {
         EPD_1IN54_SetCursor(0, j);
         EPD_1IN54_SendCommand(0x24);

@@ -32,10 +32,9 @@ void setup()
 {
   Serial.begin(115200);
   delay(100);
-  Serial.println("===== E-Paper A-G & 1-9 =====");
   DEV_Module_Init();
 
-  // 1. Init & Clear
+  // 1. Init & Clear (内部自动处理首次刷新问题)
   EPD_FUNC_INIT();
   EPD_FUNC_CLEAR();
   DEV_Delay_ms(500);
@@ -43,64 +42,30 @@ void setup()
   // 2. Create buffer
   UBYTE *BlackImage;
   UWORD Imagesize = ((EPD_WIDTH % 8 == 0) ? (EPD_WIDTH / 8) : (EPD_WIDTH / 8 + 1)) * EPD_HEIGHT;
-  if ((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL) {
-    Serial.println("ERROR: malloc failed!");
-    while (1);
-  }
+  BlackImage = (UBYTE *)malloc(Imagesize);
 
   // 3. Draw
   Paint_NewImage(BlackImage, EPD_WIDTH, EPD_HEIGHT, 270, WHITE);
   Paint_SelectImage(BlackImage);
   Paint_Clear(WHITE);
 
-  int screenW = EPD_WIDTH;   // 200
-  int cw = Font20.Width;     // 14px per char
-  int ch = Font20.Height;    // 20px
+  // 边框 + 对角线
+  Paint_DrawRectangle(0, 0, EPD_WIDTH - 1, EPD_HEIGHT - 1, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
+  Paint_DrawLine(0, 0, EPD_WIDTH - 1, EPD_HEIGHT - 1, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
+  Paint_DrawLine(EPD_WIDTH - 1, 0, 0, EPD_HEIGHT - 1, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
 
-  // ===== 第一行: A ~ G (Font20) =====
-  int n1 = 7;
-  int gap1 = (screenW - n1 * cw) / (n1 + 1);  // 等间隔 = 12px
-  // 微调: 把多余像素分到两边
-  int margin1 = (screenW - (n1 * cw + (n1 + 1) * gap1)) / 2;
-
-  const char letters[] = "ABCDEFG";
-  for (int i = 0; i < n1; i++) {
-    int x = margin1 + gap1 + i * (cw + gap1);
-    char str[2] = {letters[i], '\0'};
-    Paint_DrawString_EN(x, 30, str, &Font20, BLACK, WHITE);
-  }
-
-  // 分割线
-  Paint_DrawLine(10, 65, screenW - 10, 65, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-
-  // ===== 第二行: 1 ~ 9 (Font20) =====
-  int n2 = 9;
-  int gap2 = (screenW - n2 * cw) / (n2 + 1);  // 等间隔 = 7px
-  int margin2 = (screenW - (n2 * cw + (n2 + 1) * gap2)) / 2;
-
-  for (int i = 0; i < n2; i++) {
-    int x = margin2 + gap2 + i * (cw + gap2);
-    Paint_DrawNum(x, 85, i + 1, &Font20, BLACK, WHITE);
-  }
-
-  // 分割线
-  Paint_DrawLine(10, 120, screenW - 10, 120, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-
-  // ===== 第三行: 标签 =====
-  Paint_DrawString_EN(10, 140, "Letters", &Font16, BLACK, WHITE);
-  Paint_DrawString_EN(10, 160, "Digits", &Font16, BLACK, WHITE);
-  Paint_DrawNum(70, 160, 123456789, &Font16, BLACK, WHITE);
+  // A ~ G  等间隔（Font20 宽 14px, 7 字符等分 200px）
+  Paint_DrawString_EN(10, 50, "A  B  C  D  E  F  G", &Font20, BLACK, WHITE);
+  // 1 ~ 9
+  Paint_DrawString_EN(10, 80, "1 2 3 4 5 6 7 8 9", &Font20, BLACK, WHITE);
 
   EPD_FUNC_DISPLAY(BlackImage);
-  Serial.println("   -> displayed.");
   DEV_Delay_ms(5000);
 
   // 4. Sleep
   EPD_FUNC_SLEEP();
   free(BlackImage);
-  Serial.println("===== DONE =====");
+  Serial.println("DONE");
 }
 
-void loop()
-{
-}
+void loop() {}
