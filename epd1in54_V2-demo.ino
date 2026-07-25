@@ -9,8 +9,13 @@
 #include "EPD.h"
 #include "GUI_Paint.h"
 #include "imagedata.h"
+#include "WiFiTest.h"
 #include <stdlib.h>
 #include <string.h>
+
+/* 被测目标 */
+#define TEST_HOST "www.deepseek.com"
+#define TEST_PORT 443
 
 #if MODEL == 0
   #define EPD_FUNC_INIT()       EPD_1IN54_Init(EPD_1IN54_FULL)
@@ -39,33 +44,56 @@ void setup()
   EPD_FUNC_CLEAR();
   DEV_Delay_ms(500);
 
-  // 2. Create buffer
+  // 2. 运行网络测试 (串口全程有日志)
+  WiFiTestResult r = WiFiTest_run(TEST_HOST, TEST_PORT);
+
+  // 3. Create buffer
   UBYTE *BlackImage;
   UWORD Imagesize = ((EPD_WIDTH % 8 == 0) ? (EPD_WIDTH / 8) : (EPD_WIDTH / 8 + 1)) * EPD_HEIGHT;
   BlackImage = (UBYTE *)malloc(Imagesize);
 
-  // 3. Draw
+  // 4. Draw：把测试结果画到墨水屏 (白底黑字，本面板极性正常)
   Paint_NewImage(BlackImage, EPD_WIDTH, EPD_HEIGHT, 270, WHITE);
   Paint_SelectImage(BlackImage);
   Paint_Clear(WHITE);
 
-  // 边框 + 对角线
   Paint_DrawRectangle(0, 0, EPD_WIDTH - 1, EPD_HEIGHT - 1, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-  Paint_DrawLine(0, 0, EPD_WIDTH - 1, EPD_HEIGHT - 1, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-  Paint_DrawLine(EPD_WIDTH - 1, 0, 0, EPD_HEIGHT - 1, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
+  Paint_DrawString_EN(6, 6, "Net Test", &Font20, BLACK, WHITE);
+  Paint_DrawLine(4, 30, EPD_WIDTH - 5, 30, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
 
-  // A ~ G  等间隔（Font20 宽 14px, 7 字符等分 200px）
-  Paint_DrawString_EN(10, 50, "A  B  C  D  E  F  G", &Font20, BLACK, WHITE);
-  // 1 ~ 9
-  Paint_DrawString_EN(10, 80, "1 2 3 4 5 6 7 8 9", &Font20, BLACK, WHITE);
+  // WiFi 状态
+  Paint_DrawString_EN(6, 40, r.wifiConnected ? "WiFi: OK" : "WiFi: FAIL",
+                      &Font16, BLACK, WHITE);
+  // 本机 IP
+  Paint_DrawString_EN(6, 60, r.localIP.c_str(), &Font16, BLACK, WHITE);
+  // DNS 解析结果
+  Paint_DrawString_EN(6, 80, r.dnsOK ? "DNS: OK" : "DNS: FAIL",
+                      &Font16, BLACK, WHITE);
+  Paint_DrawString_EN(6, 100, r.hostIP.c_str(), &Font16, BLACK, WHITE);
+  // TCP 连通性 + 耗时
+  if (r.tcpOK) {
+    Paint_DrawString_EN(6, 120, "Net: OK", &Font16, BLACK, WHITE);
+    Paint_DrawNum(90, 120, (int32_t)r.tcpMs, &Font16, BLACK, WHITE);
+    Paint_DrawString_EN(140, 120, "ms", &Font16, BLACK, WHITE);
+  } else {
+    Paint_DrawString_EN(6, 120, "Net: FAIL", &Font16, BLACK, WHITE);
+  }
 
   EPD_FUNC_DISPLAY(BlackImage);
-  DEV_Delay_ms(5000);
+  DEV_Delay_ms(2000);
 
-  // 4. Sleep
+  // 5. Sleep（保持 WiFi 连着，方便 loop 里复测）
   EPD_FUNC_SLEEP();
   free(BlackImage);
   Serial.println("DONE");
 }
 
-void loop() {}
+void loop()
+{
+  // 每 30s 复测一次连通性，仅打印到串口（不再刷新墨水屏以省电/护屏）
+  static uint32_t last = 0;
+  if (millis() - last > 30000) {
+    last = millis();
+    WiFiTest_pingOnce(TEST_HOST, TEST_PORT);
+  }
+}
