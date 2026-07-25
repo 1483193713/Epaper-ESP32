@@ -23,9 +23,10 @@
 
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
+#include "secrets.h"   // 真实 Key 放这里 (已被 .gitignore 忽略)
 
-/* ==== 在这里填写你的 DeepSeek API Key (形如 sk-xxxx) ==== */
-#define DEEPSEEK_API_KEY "REPLACE_WITH_YOUR_KEY"
+/* API Key 从 secrets.h 读取; 若没建 secrets.h, 复制 secrets.h.example */
+#define DEEPSEEK_API_KEY SECRET_DEEPSEEK_API_KEY
 
 #define DEEPSEEK_BALANCE_URL "https://api.deepseek.com/user/balance"
 #define DEEPSEEK_HTTP_TIMEOUT_MS 10000

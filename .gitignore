@@ -7,3 +7,6 @@ build/
 *.d
 *.elf
 .claude/
+
+# 本地密钥, 切勿提交
+secrets.h

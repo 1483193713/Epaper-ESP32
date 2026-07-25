@@ -13,10 +13,11 @@
 #define _WIFI_TEST_H_
 
 #include <WiFi.h>
+#include "secrets.h"   // WiFi 账号密码放这里 (已被 .gitignore 忽略)
 
-/* ==== 在这里填写你的 WiFi ==== */
-#define WIFI_SSID     "XIAOMIMI"
-#define WIFI_PASSWORD "00000000"
+/* WiFi 账号密码从 secrets.h 读取; 若没建 secrets.h, 复制 secrets.h.example */
+#define WIFI_SSID     SECRET_WIFI_SSID
+#define WIFI_PASSWORD SECRET_WIFI_PASSWORD
 
 /* 连接 WiFi 的最长等待时间 (毫秒) */
 #define WIFI_CONNECT_TIMEOUT_MS 15000
