@@ -1,7 +1,7 @@
 /*
  * ESP32 + Waveshare 1.54" e-Paper V1
  * 开机连 WiFi -> 查询 DeepSeek 账户余额 -> 显示到墨水屏
- * 每 1 分钟刷新一次余额
+ * 每 2 分钟刷新一次余额
  * BUSY->21  RST->4  DC->16  CS->17  SCK->18  MOSI->19
  */
 #define MODEL 0
@@ -12,7 +12,9 @@
 #include "imagedata.h"
 #include "WiFiTest.h"
 #include "DeepSeekBalance.h"
+#include "BeibeiBalance.h"
 #include "logo_deepseek.h"
+#include "beibei_logo.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -43,39 +45,65 @@
 static UBYTE *BlackImage = NULL;
 
 /* 把余额信息画到墨水屏 (白底黑字) --------------------------------------*/
-static void drawBalance(const DSBalance &b)
+static void drawBalance(const DSBalance &b, const BBalance &bb)
 {
   Paint_SelectImage(BlackImage);
   Paint_Clear(WHITE);
 
   Paint_DrawRectangle(0, 0, EPD_WIDTH - 1, EPD_HEIGHT - 1, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-  // 左上角画 DeepSeek logo (100x100, X 需为 8 的倍数)
-  
+  Paint_DrawImage(gImage_beibei, 102, 100, LOGO_BB_WIDTH, LOGO_BB_HEIGHT);
   Paint_DrawImage(gImage_deepseek, 0, 100, LOGO_DS_WIDTH, LOGO_DS_HEIGHT);
   Paint_DrawLine(4, 100, EPD_WIDTH - 5, 100, BLACK, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
-  Paint_DrawLine(100, 4, 100, 100, BLACK, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+  Paint_DrawLine(100, 4, 100, 196, BLACK, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
 
   if (!b.httpOk) {
     // 查询失败：显示错误码
     Paint_DrawString_EN(6, 122, "Query FAIL", &Font16, BLACK, WHITE);
     Paint_DrawString_EN(6, 145, "HTTP:", &Font16, BLACK, WHITE);
     Paint_DrawNum(70, 145, (int32_t)b.httpCode, &Font16, BLACK, WHITE);
+    // 贝贝AI 余额 (x=4, y=120)
+    if (bb.quota > 0) {
+      float usd = (float)bb.quota / BEIBEI_QUOTA_PER_USD;
+      char buf[16];
+      snprintf(buf, sizeof(buf), "$%.2f", usd);
+      Paint_DrawString_EN(104, 108, "Rest:", &Font16, BLACK, WHITE);
+      Paint_DrawString_EN(104, 128, buf, &Font20, BLACK, WHITE);
+      snprintf(buf, sizeof(buf), "%.1fM", (double)bb.quota / 1000000.0);
+      Paint_DrawString_EN(104, 155, "Token:", &Font16, BLACK, WHITE);
+      Paint_DrawString_EN(104, 175, buf, &Font12, BLACK, WHITE);
+    } else {
+      Paint_DrawString_EN(104, 140, "BB:ERR", &Font20, BLACK, WHITE);
+    }
     EPD_FUNC_DISPLAY(BlackImage);
     return;
   }
 
-  // 横线下方分开显示 币种 和 总余额
-  Paint_DrawString_EN(110, 5, b.currency.c_str(), &Font20, BLACK, WHITE);
-  Paint_DrawString_EN(110, 30, b.totalBalance.c_str(), &Font24, BLACK, WHITE);
+  // 右上区域: DeepSeek 币种和余额
+  Paint_DrawString_EN(102, 5, b.currency.c_str(), &Font20, BLACK, WHITE);
+  Paint_DrawString_EN(105, 30, b.totalBalance.c_str(), &Font20, BLACK, WHITE);
 
-  // 当前时间 (Font8, hh:mm:ss)
+  // 当前时间
   {
     struct tm ti;
     char tbuf[16];
     if (getLocalTime(&ti, 100)) {
       snprintf(tbuf, sizeof(tbuf), "%02d:%02d:%02d", ti.tm_hour, ti.tm_min, ti.tm_sec);
-      Paint_DrawString_EN(130, 86, tbuf, &Font12, BLACK, WHITE);
+      Paint_DrawString_EN(140, 86, tbuf, &Font12, BLACK, WHITE);
     }
+  }
+
+  // 贝贝AI 余额
+  if (bb.quota > 0) {
+    float usd = (float)bb.quota / BEIBEI_QUOTA_PER_USD;
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%.2f", usd);
+    Paint_DrawString_EN(102, 104, "CNY:", &Font20, BLACK, WHITE);
+    Paint_DrawString_EN(105, 129, buf, &Font20, BLACK, WHITE);
+    snprintf(buf, sizeof(buf), "%.1fM", (double)bb.quota / 1000000.0);
+    Paint_DrawString_EN(102, 150, "Token:", &Font20, BLACK, WHITE);
+    Paint_DrawString_EN(105, 175, buf, &Font20, BLACK, WHITE);
+  } else {
+    Paint_DrawString_EN(104, 140, "BB:ERR", &Font20, BLACK, WHITE);
   }
 
   EPD_FUNC_DISPLAY(BlackImage);
@@ -84,8 +112,12 @@ static void drawBalance(const DSBalance &b)
 /* 查询余额并刷新屏幕 ----------------------------------------------------*/
 static void refreshBalance()
 {
-  DSBalance b = DeepSeek_getBalance();
-  drawBalance(b);
+  DSBalance b  = DeepSeek_getBalance();
+  BBalance  bb = Beibei_getBalance();
+  // DEBUG: print bb status
+  Serial.printf("[DBG] bb.httpOk=%d quota=%lld success=%d\r\n",
+                bb.httpOk, bb.quota, bb.success);
+  drawBalance(b, bb);
 }
 
 void setup()
@@ -111,7 +143,7 @@ void setup()
   BlackImage = (UBYTE *)malloc(Imagesize);
   Paint_NewImage(BlackImage, EPD_WIDTH, EPD_HEIGHT, 270, WHITE);
 
-  // 4. 查一次余额并显示 (界面右上角含 DeepSeek logo)
+  // 4. 查一次余额并显示
   refreshBalance();
 
   Serial.println("DONE");
