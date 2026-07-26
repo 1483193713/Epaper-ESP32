@@ -15,9 +15,13 @@
 #include "logo_deepseek.h"
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /* 余额刷新间隔 (毫秒) */
-#define REFRESH_INTERVAL_MS 60000UL
+#define REFRESH_INTERVAL_MS 120000UL
+
+/* NTP 时区 (秒) — UTC+8 */
+#define TZ_OFFSET_SEC (8 * 3600)
 
 #if MODEL == 0
   #define EPD_FUNC_INIT()       EPD_1IN54_Init(EPD_1IN54_FULL)
@@ -45,10 +49,11 @@ static void drawBalance(const DSBalance &b)
   Paint_Clear(WHITE);
 
   Paint_DrawRectangle(0, 0, EPD_WIDTH - 1, EPD_HEIGHT - 1, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-  // 顶部居中画 DeepSeek logo (100x100, X 需为 8 的倍数)
-  // 居中: (200-100)/2=50 -> 取 8 的倍数 48
+  // 左上角画 DeepSeek logo (100x100, X 需为 8 的倍数)
+  
   Paint_DrawImage(gImage_deepseek, 0, 100, LOGO_DS_WIDTH, LOGO_DS_HEIGHT);
-  Paint_DrawLine(4, 112, EPD_WIDTH - 5, 112, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
+  Paint_DrawLine(4, 100, EPD_WIDTH - 5, 100, BLACK, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
+  Paint_DrawLine(100, 4, 100, 100, BLACK, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
 
   if (!b.httpOk) {
     // 查询失败：显示错误码
@@ -59,9 +64,19 @@ static void drawBalance(const DSBalance &b)
     return;
   }
 
-  // 横线下方显示 货币 + 总余额 (Font20)
-  String line1 = b.currency + " " + b.totalBalance;
-  Paint_DrawString_EN(6, 124, line1.c_str(), &Font20, BLACK, WHITE);
+  // 横线下方分开显示 币种 和 总余额
+  Paint_DrawString_EN(110, 5, b.currency.c_str(), &Font20, BLACK, WHITE);
+  Paint_DrawString_EN(110, 30, b.totalBalance.c_str(), &Font24, BLACK, WHITE);
+
+  // 当前时间 (Font8, hh:mm:ss)
+  {
+    struct tm ti;
+    char tbuf[16];
+    if (getLocalTime(&ti, 100)) {
+      snprintf(tbuf, sizeof(tbuf), "%02d:%02d:%02d", ti.tm_hour, ti.tm_min, ti.tm_sec);
+      Paint_DrawString_EN(130, 86, tbuf, &Font12, BLACK, WHITE);
+    }
+  }
 
   EPD_FUNC_DISPLAY(BlackImage);
 }
@@ -86,6 +101,10 @@ void setup()
 
   // 2. 连 WiFi (串口有日志)
   WiFiTest_connect();
+
+  // 2.5 同步网络时间 (NTP)
+  configTime(TZ_OFFSET_SEC, 0, "pool.ntp.org", "time.nist.gov");
+  Serial.println("[NTP] Syncing time...");
 
   // 3. 分配图像缓冲区 (只分配一次, 反复复用)
   UWORD Imagesize = ((EPD_WIDTH % 8 == 0) ? (EPD_WIDTH / 8) : (EPD_WIDTH / 8 + 1)) * EPD_HEIGHT;
