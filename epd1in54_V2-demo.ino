@@ -12,9 +12,9 @@
 #include "imagedata.h"
 #include "WiFiTest.h"
 #include "DeepSeekBalance.h"
-#include "BeibeiBalance.h"
+#include "CodeCliBalance.h"
 #include "logo_deepseek.h"
-#include "beibei_logo.h"
+#include "codecli_logo.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -45,13 +45,13 @@
 static UBYTE *BlackImage = NULL;
 
 /* 把余额信息画到墨水屏 (白底黑字) --------------------------------------*/
-static void drawBalance(const DSBalance &b, const BBalance &bb)
+static void drawBalance(const DSBalance &b, const CCBalance &cc)
 {
   Paint_SelectImage(BlackImage);
   Paint_Clear(WHITE);
 
   Paint_DrawRectangle(0, 0, EPD_WIDTH - 1, EPD_HEIGHT - 1, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-  Paint_DrawImage(gImage_beibei, 102, 100, LOGO_BB_WIDTH, LOGO_BB_HEIGHT);
+  Paint_DrawImage(gImage_codecli, 102, 100, LOGO_CC_WIDTH, LOGO_CC_HEIGHT);
   Paint_DrawImage(gImage_deepseek, 0, 100, LOGO_DS_WIDTH, LOGO_DS_HEIGHT);
   Paint_DrawLine(4, 100, EPD_WIDTH - 5, 100, BLACK, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
   Paint_DrawLine(100, 4, 100, 196, BLACK, DOT_PIXEL_2X2, LINE_STYLE_SOLID);
@@ -61,18 +61,18 @@ static void drawBalance(const DSBalance &b, const BBalance &bb)
     Paint_DrawString_EN(6, 122, "Query FAIL", &Font16, BLACK, WHITE);
     Paint_DrawString_EN(6, 145, "HTTP:", &Font16, BLACK, WHITE);
     Paint_DrawNum(70, 145, (int32_t)b.httpCode, &Font16, BLACK, WHITE);
-    // 贝贝AI 余额 (x=4, y=120)
-    if (bb.quota > 0) {
-      float usd = (float)bb.quota / BEIBEI_QUOTA_PER_USD;
+    // Code-CLI 余额 (x=4, y=120)
+    if (cc.quota > 0) {
+      float usd = (float)cc.quota / CODECLI_QUOTA_PER_USD;
       char buf[16];
       snprintf(buf, sizeof(buf), "$%.2f", usd);
       Paint_DrawString_EN(104, 108, "Rest:", &Font16, BLACK, WHITE);
       Paint_DrawString_EN(104, 128, buf, &Font20, BLACK, WHITE);
-      snprintf(buf, sizeof(buf), "%.1fM", (double)bb.quota / 1000000.0);
+      snprintf(buf, sizeof(buf), "%.1fM", (double)cc.quota / 1000000.0);
       Paint_DrawString_EN(104, 155, "Token:", &Font16, BLACK, WHITE);
       Paint_DrawString_EN(104, 175, buf, &Font12, BLACK, WHITE);
     } else {
-      Paint_DrawString_EN(104, 140, "BB:ERR", &Font20, BLACK, WHITE);
+      Paint_DrawString_EN(104, 140, "CC:ERR", &Font20, BLACK, WHITE);
     }
     EPD_FUNC_DISPLAY(BlackImage);
     return;
@@ -92,18 +92,18 @@ static void drawBalance(const DSBalance &b, const BBalance &bb)
     }
   }
 
-  // 贝贝AI 余额
-  if (bb.quota > 0) {
-    float usd = (float)bb.quota / BEIBEI_QUOTA_PER_USD;
+  // Code-CLI 余额
+  if (cc.quota > 0) {
+    float usd = (float)cc.quota / CODECLI_QUOTA_PER_USD;
     char buf[16];
     snprintf(buf, sizeof(buf), "%.2f", usd);
     Paint_DrawString_EN(102, 104, "CNY:", &Font20, BLACK, WHITE);
     Paint_DrawString_EN(105, 129, buf, &Font20, BLACK, WHITE);
-    snprintf(buf, sizeof(buf), "%.1fM", (double)bb.quota / 1000000.0);
+    snprintf(buf, sizeof(buf), "%.1fM", (double)cc.quota / 1000000.0);
     Paint_DrawString_EN(102, 150, "Token:", &Font20, BLACK, WHITE);
     Paint_DrawString_EN(105, 175, buf, &Font20, BLACK, WHITE);
   } else {
-    Paint_DrawString_EN(104, 140, "BB:ERR", &Font20, BLACK, WHITE);
+    Paint_DrawString_EN(104, 140, "CC:ERR", &Font20, BLACK, WHITE);
   }
 
   EPD_FUNC_DISPLAY(BlackImage);
@@ -113,11 +113,11 @@ static void drawBalance(const DSBalance &b, const BBalance &bb)
 static void refreshBalance()
 {
   DSBalance b  = DeepSeek_getBalance();
-  BBalance  bb = Beibei_getBalance();
-  // DEBUG: print bb status
-  Serial.printf("[DBG] bb.httpOk=%d quota=%lld success=%d\r\n",
-                bb.httpOk, bb.quota, bb.success);
-  drawBalance(b, bb);
+  CCBalance  cc = CodeCli_getBalance();
+  // DEBUG: print cc status
+  Serial.printf("[DBG] cc.httpOk=%d quota=%lld success=%d\r\n",
+                cc.httpOk, cc.quota, cc.success);
+  drawBalance(b, cc);
 }
 
 void setup()
